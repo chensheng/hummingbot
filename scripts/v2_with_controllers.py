@@ -103,7 +103,7 @@ class V2WithControllers(StrategyV2Base):
                 self.executor_orchestrator.execute_actions(
                     [StopExecutorAction(executor_id=executor.id,
                                         controller_id=executor.controller_id) for executor in executors_to_stop])
-            if not controller.config.manual_kill_switch and controller.status == RunnableStatus.TERMINATED:
+            if not controller.config.manual_kill_switch and (controller.status == RunnableStatus.TERMINATED or controller.status == RunnableStatus.NOT_STARTED):
                 if controller_id in self.drawdown_exited_controllers:
                     continue
                 self.logger().info(f"Restarting controller {controller_id}.")
