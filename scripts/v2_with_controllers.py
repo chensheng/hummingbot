@@ -90,7 +90,11 @@ class V2WithControllers(StrategyV2Base):
 
     def send_performance_report(self):
         if self.current_timestamp - self._last_performance_report_timestamp >= self.performance_report_interval and self._pub:
-            performance_reports = {controller_id: self.get_performance_report(controller_id).dict() for controller_id in self.controllers.keys()}
+            performance_reports = {}
+            for controller_id in self.controllers.keys():
+                perf_report = self.get_performance_report(controller_id)
+                if perf_report is not None:
+                    performance_reports[controller_id] = perf_report.dict()
             self._pub(performance_reports)
             self._last_performance_report_timestamp = self.current_timestamp
 
@@ -103,7 +107,7 @@ class V2WithControllers(StrategyV2Base):
                 self.executor_orchestrator.execute_actions(
                     [StopExecutorAction(executor_id=executor.id,
                                         controller_id=executor.controller_id) for executor in executors_to_stop])
-            if not controller.config.manual_kill_switch and controller.status == RunnableStatus.TERMINATED:
+            if not controller.config.manual_kill_switch and (controller.status == RunnableStatus.TERMINATED or controller.status == RunnableStatus.NOT_STARTED):
                 if controller_id in self.drawdown_exited_controllers:
                     continue
                 self.logger().info(f"Restarting controller {controller_id}.")
