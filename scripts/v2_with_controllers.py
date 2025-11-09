@@ -94,7 +94,10 @@ class V2WithControllers(StrategyV2Base):
             for controller_id in self.controllers.keys():
                 perf_report = self.get_performance_report(controller_id)
                 if perf_report is not None:
-                    performance_reports[controller_id] = perf_report.dict()
+                    perf_report_dict = perf_report.dict()
+                    controller = self.controllers[controller_id]
+                    perf_report_dict["status"] = controller.status
+                    performance_reports[controller_id] = perf_report_dict
             self._pub(performance_reports)
             self._last_performance_report_timestamp = self.current_timestamp
 
