@@ -72,7 +72,7 @@ class ScriptStrategyBase(StrategyPyBase):
                     self.logger().warning(f"{con.name} is not ready. status_dict: {con.status_dict}. Please wait...")
                 return
             else:
-                self.logger().info("All connectors are ready. Starting the strategy...")
+                self.logger().info(f"All connectors are ready. The strategy is ready with connectors: {self.connectors.keys()}")
         else:
             self.on_tick()
 
