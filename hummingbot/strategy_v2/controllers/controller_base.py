@@ -173,7 +173,7 @@ class ControllerBase(RunnableBase):
             await self.update_processed_data()
             executor_actions: List[ExecutorAction] = self.determine_executor_actions()
             if len(executor_actions) > 0:
-                self.logger().debug(f"Sending actions: {executor_actions}")
+                self.logger().info(f"Sending actions: {executor_actions}")
                 await self.send_actions(executor_actions)
 
     async def send_actions(self, executor_actions: List[ExecutorAction]):
