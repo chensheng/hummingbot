@@ -131,9 +131,10 @@ class V2WithControllers(StrategyV2Base):
                 
                 self.logger().info(f"Try to stop controller {controller_id} because closed executors found: {perf_report.close_type_counts}")
                 controller.stop()
+                executors_to_stop = self.get_executors_by_controller(controller_id)
                 self.executor_orchestrator.execute_actions(
                     [StopExecutorAction(executor_id=executor.id,
-                                        controller_id=executor.controller_id) for executor in self.get_executors_by_controller(controller_id)])
+                                        controller_id=executor.controller_id) for executor in executors_to_stop])
             except Exception as e:
                 self.logger().error(f"Error checking controller {controller_id} status: {e}")
 
