@@ -120,10 +120,12 @@ class V2WithControllers(StrategyV2Base):
     
     def check_controller_status(self):
         for controller_id, controller in self.controllers.items():
+            if controller_id is None:
+                continue            
             try:
                 perf_report = self.get_performance_report(controller_id)
                 if perf_report is None or isinstance(perf_report, PerformanceReport):
-                    self.logger().info(f"Controller {controller_id} has no performance report")
+                    self.logger().debug(f"Controller {controller_id} has no performance report")
                     continue
                 
                 if perf_report.close_type_counts is None or len(perf_report.close_type_counts) == 0:
