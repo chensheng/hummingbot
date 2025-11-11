@@ -9,6 +9,7 @@ from hummingbot.data_feed.candles_feed.data_types import CandlesConfig
 from hummingbot.strategy.strategy_v2_base import StrategyV2Base, StrategyV2ConfigBase
 from hummingbot.strategy_v2.models.base import RunnableStatus
 from hummingbot.strategy_v2.models.executor_actions import CreateExecutorAction, StopExecutorAction
+from hummingbot.strategy_v2.models.executors_info import PerformanceReport
 
 
 class V2WithControllersConfig(StrategyV2ConfigBase):
@@ -47,6 +48,7 @@ class V2WithControllers(StrategyV2Base):
             self.check_manual_kill_switch()
             self.control_max_drawdown()
             self.send_performance_report()
+            self.check_controller_status()
 
     def control_max_drawdown(self):
         if self.config.max_controller_drawdown_quote:
@@ -115,6 +117,25 @@ class V2WithControllers(StrategyV2Base):
                     continue
                 self.logger().info(f"Restarting controller {controller_id}.")
                 controller.start()
+    
+    def check_controller_status(self):
+        for controller_id, controller in self.controllers.items():
+            try:
+                perf_report = self.get_performance_report(controller_id)
+                if perf_report is None or isinstance(perf_report, PerformanceReport):
+                    self.logger().info(f"Controller {controller_id} has no performance report")
+                    continue
+                
+                if perf_report.close_type_counts is None or len(perf_report.close_type_counts) == 0:
+                    continue
+                
+                self.logger().info(f"Try to stop controller {controller_id} because closed executors found: {perf_report.close_type_counts}")
+                controller.stop()
+                self.executor_orchestrator.execute_actions(
+                    [StopExecutorAction(executor_id=executor.id,
+                                        controller_id=executor.controller_id) for executor in self.get_executors_by_controller(controller_id)])
+            except Exception as e:
+                self.logger().error(f"Error checking controller {controller_id} status: {e}")
 
     def check_executors_status(self):
         active_executors = self.filter_executors(
