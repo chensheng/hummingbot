@@ -132,6 +132,7 @@ class V2WithControllers(StrategyV2Base):
                     continue
                 
                 self.logger().info(f"Try to stop controller {controller_id} because closed executors found: {perf_report.close_type_counts}")
+                controller.config.manual_kill_switch = True
                 controller.stop()
                 executors_to_stop = self.get_executors_by_controller(controller_id)
                 self.executor_orchestrator.execute_actions(
