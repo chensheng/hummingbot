@@ -124,7 +124,7 @@ class V2WithControllers(StrategyV2Base):
                 continue            
             try:
                 perf_report = self.get_performance_report(controller_id)
-                if perf_report is None or isinstance(perf_report, PerformanceReport):
+                if perf_report is None or not isinstance(perf_report, PerformanceReport):
                     self.logger().debug(f"Controller {controller_id} has no performance report")
                     continue
                 
