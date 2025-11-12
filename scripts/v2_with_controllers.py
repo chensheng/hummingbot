@@ -41,6 +41,7 @@ class V2WithControllers(StrategyV2Base):
         self.drawdown_exited_controllers = []
         self.closed_executors_buffer: int = 30
         self._last_performance_report_timestamp = 0
+        self.shutdown_controllers = []
 
     def on_tick(self):
         super().on_tick()
@@ -115,21 +116,26 @@ class V2WithControllers(StrategyV2Base):
             if not controller.config.manual_kill_switch and (controller.status == RunnableStatus.TERMINATED or controller.status == RunnableStatus.NOT_STARTED):
                 if controller_id in self.drawdown_exited_controllers:
                     continue
+                if controller_id in self.shutdown_controllers:
+                    continue
                 self.logger().info(f"Restarting controller {controller_id}.")
                 controller.start()
     
     def check_controller_status(self):
         for controller_id, controller in self.controllers.items():
+            if controller_id is None:
+                continue            
             try:
                 perf_report = self.get_performance_report(controller_id)
-                if perf_report is None or isinstance(perf_report, PerformanceReport):
-                    self.logger().info(f"Controller {controller_id} has no performance report")
+                if perf_report is None or not isinstance(perf_report, PerformanceReport):
+                    self.logger().debug(f"Controller {controller_id} has no performance report")
                     continue
                 
                 if perf_report.close_type_counts is None or len(perf_report.close_type_counts) == 0:
                     continue
                 
                 self.logger().info(f"Try to stop controller {controller_id} because closed executors found: {perf_report.close_type_counts}")
+                self.shutdown_controllers.append(controller_id)
                 controller.stop()
                 executors_to_stop = self.get_executors_by_controller(controller_id)
                 self.executor_orchestrator.execute_actions(
