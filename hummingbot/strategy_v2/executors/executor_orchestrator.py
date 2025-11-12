@@ -458,6 +458,7 @@ class ExecutorOrchestrator:
                     )
                     position.add_orders_from_executor(executor_info)
                     positions.append(position)
+            self.positions_held[controller_id] = positions
 
     def _determine_position_side(self, executor_info: ExecutorInfo) -> Optional[TradeType]:
         """
