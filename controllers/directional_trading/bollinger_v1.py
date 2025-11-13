@@ -89,7 +89,7 @@ class BollingerV1Controller(DirectionalTradingControllerBase):
         self.processed_data["features"] = df
 
         current_time = time.time()
-        if current_time - self.last_log_time > 60:  # 1 minute
+        if current_time - self.last_log_time > 120:  # 2 minute
             condition_info = "观望信号"
             if self.processed_data["signal"] == 1:
                 condition_info = "多单信号"

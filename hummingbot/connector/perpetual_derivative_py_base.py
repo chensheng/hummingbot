@@ -107,7 +107,7 @@ class PerpetualDerivativePyBase(ExchangePyBase, ABC):
         if mode in self.supported_position_modes():
             safe_ensure_future(self._execute_set_position_mode(mode))
         else:
-            self.logger().error(f"Position mode {mode} is not supported. Mode not set.")
+            self.logger().info(f"Position mode {mode} is not supported. Mode not set.")
 
     def get_leverage(self, trading_pair: str) -> int:
         return self._perpetual_trading.get_leverage(trading_pair)
