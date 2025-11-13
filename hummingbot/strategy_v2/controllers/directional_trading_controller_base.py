@@ -2,6 +2,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 import pandas as pd
+import time
 from pydantic import Field, field_validator
 
 from hummingbot.client.ui.interface_utils import format_df_for_printout
@@ -160,6 +161,7 @@ class DirectionalTradingControllerBase(ControllerBase):
         self.config = config
         self.market_data_provider.initialize_rate_sources([ConnectorPair(
             connector_name=config.connector_name, trading_pair=config.trading_pair)])
+        self.last_log_time = 0
 
     def determine_executor_actions(self) -> List[ExecutorAction]:
         """
@@ -191,6 +193,16 @@ class DirectionalTradingControllerBase(ControllerBase):
             create_actions.append(CreateExecutorAction(
                 controller_id=self.config.id,
                 executor_config=self.get_executor_config(trade_type, price, amount)))
+        
+        current_time = time.time()
+        if current_time - self.last_log_time > 120:  # 2 minute
+            signal_info = "Receive sidelines signal"
+            if self.processed_data["signal"] == 1:
+                signal_info = "Receive long signal"
+            elif self.processed_data["signal"] == -1:
+                signal_info = "Receive short signal"
+            self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] {signal_info}")
+            self.last_log_time = current_time
 
         return create_actions
 

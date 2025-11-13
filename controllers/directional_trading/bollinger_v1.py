@@ -90,10 +90,5 @@ class BollingerV1Controller(DirectionalTradingControllerBase):
 
         current_time = time.time()
         if current_time - self.last_log_time > 120:  # 2 minute
-            signal_info = "sidelines signal"
-            if self.processed_data["signal"] == 1:
-                signal_info = "long signal"
-            elif self.processed_data["signal"] == -1:
-                signal_info = "short signal"
-            self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] {signal_info}: current bbp={bbp.iloc[-1]}, long threshold={self.config.bb_long_threshold}, short threshold={self.config.bb_short_threshold}")
+            self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] bollinger data: current bbp={bbp.iloc[-1]}, long threshold={self.config.bb_long_threshold}, short threshold={self.config.bb_short_threshold}")
             self.last_log_time = current_time

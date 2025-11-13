@@ -11,6 +11,7 @@ from hummingbot.strategy_v2.executors.order_executor.data_types import Execution
 from hummingbot.strategy_v2.executors.position_executor.data_types import TrailingStop, TripleBarrierConfig
 from hummingbot.strategy_v2.models.executor_actions import CreateExecutorAction, ExecutorAction, StopExecutorAction
 from hummingbot.strategy_v2.models.executors import CloseType
+import time
 
 
 class MarketMakingControllerConfigBase(ControllerConfigBase):
@@ -238,6 +239,7 @@ class MarketMakingControllerBase(ControllerBase):
         self.config = config
         self.market_data_provider.initialize_rate_sources([ConnectorPair(
             connector_name=config.connector_name, trading_pair=config.trading_pair)])
+        self.last_log_time=0
 
     def determine_executor_actions(self) -> List[ExecutorAction]:
         """
@@ -269,6 +271,12 @@ class MarketMakingControllerBase(ControllerBase):
                     controller_id=self.config.id,
                     executor_config=executor_config
                 ))
+        
+        current_time = time.time()
+        if current_time - self.last_log_time > 120:  # 2 minute
+            self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] Receive levels to execute: {levels_to_execute}")
+            self.last_log_time = current_time
+        
         return create_actions
 
     def get_levels_to_execute(self) -> List[str]:
