@@ -3,6 +3,7 @@ from typing import List
 import pandas_ta as ta  # noqa: F401
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
+import time
 
 from hummingbot.data_feed.candles_feed.data_types import CandlesConfig
 from hummingbot.strategy_v2.controllers.directional_trading_controller_base import (
@@ -62,6 +63,7 @@ class BollingerV1Controller(DirectionalTradingControllerBase):
                 interval=config.interval,
                 max_records=self.max_records
             )]
+        self.last_log_time = 0
         super().__init__(config, *args, **kwargs)
 
     async def update_processed_data(self):
@@ -85,3 +87,13 @@ class BollingerV1Controller(DirectionalTradingControllerBase):
         # Update processed data
         self.processed_data["signal"] = df["signal"].iloc[-1]
         self.processed_data["features"] = df
+
+        current_time = time.time()
+        if current_time - self.last_log_time > 60:  # 1 minute
+            condition_info = "观望信号"
+            if self.processed_data["signal"] == 1:
+                condition_info = "多单信号"
+            elif self.processed_data["signal"] == -1:
+                condition_info = "空单信号"
+            self.logger().info(f"[{self.config.id}] {condition_info}：当前布林带={bbp.iloc[-1]}，多单阈值={self.config.bb_long_threshold}，空单阈值={self.config.bb_short_threshold}")
+            self.last_log_time = current_time

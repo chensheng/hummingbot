@@ -225,7 +225,8 @@ class StrategyV2Base(ScriptStrategyBase):
 
         # Start controllers
         for controller in self.controllers.values():
-            controller.start()
+            if not controller.config.manual_kill_switch:
+                controller.start()
 
     def apply_initial_setting(self):
         """
