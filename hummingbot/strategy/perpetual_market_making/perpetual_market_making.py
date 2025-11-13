@@ -539,7 +539,7 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
         if mode == PositionMode.ONEWAY:
             # in one-way mode, only one active position is expected per time
             if len(active_positions) > 1:
-                self.logger().error(f"More than one open position in {mode.name} position mode. "
+                self.logger().error(f"[{self.trading_pair}] More than one open position in {mode.name} position mode. "
                                     "Kindly ensure you do not interact with the exchange through "
                                     "other platforms and restart this strategy.")
             else:
@@ -548,8 +548,8 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                     if ((active_positions[0].amount < 0 and order.is_buy)
                             or (active_positions[0].amount > 0 and not order.is_buy)):
                         self.cancel_order(self._market_info, order.client_order_id)
-                        self.logger().info(f"Initiated cancelation of {'buy' if order.is_buy else 'sell'} order "
-                                           f"{order.client_order_id} in favour of take profit order.")
+                        self.logger().info(f"[{self.trading_pair}] Initiated cancelation of {'buy' if order.is_buy else 'sell'} order "
+                                           f"in favour of take profit order: {order.client_order_id}")
 
         for position in active_positions:
             if (ask_price > position.entry_price and position.amount > 0) or (
@@ -568,7 +568,7 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                 for old_order in old_exit_orders:
                     self.cancel_order(self._market_info, old_order.client_order_id)
                     self.logger().info(
-                        f"Initiated cancelation of previous take profit order {old_order.client_order_id} in favour of new take profit order.")
+                        f"[{self.trading_pair}] Initiated cancelation of previous take profit order in favour of new take profit order: {old_order.client_order_id}")
                 exit_order_exists = [o for o in self.active_orders if o.price == price]
                 if len(exit_order_exists) == 0:
                     if size > 0 and price > 0:
@@ -604,7 +604,7 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                 for order in existent_stop_loss_orders:
                     previous_stop_loss_price = order.price
                     self.cancel_order(self._market_info, order.client_order_id)
-                    self.logger().info(f"Canceling the limit order {order.client_order_id} to renew stop loss.")
+                    self.logger().info(f"[{self.trading_pair}] Canceling the limit order to renew stop loss: {order.client_order_id}")
                 new_price = previous_stop_loss_price or stop_loss_price
                 if (top_ask <= stop_loss_price and position.amount > 0):
                     price = market.quantize_order_price(
@@ -617,11 +617,11 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                     for old_order in take_profit_orders:
                         self.cancel_order(self._market_info, old_order.client_order_id)
                         self.logger().info(
-                            f"Canceling existing take profit order {order.client_order_id} in favor of stop loss."
+                            f"[{self.trading_pair}] Canceling existing take profit order in favor of stop loss: {order.client_order_id}"
                         )
                     size = market.quantize_order_amount(self.trading_pair, abs(position.amount))
                     if size > 0 and price > 0:
-                        self.logger().info("Creating stop loss sell order to close long position.")
+                        self.logger().info(f"[{self.trading_pair}] Creating stop loss sell order to close long position.")
                         sells.append(PriceSize(price, size))
                 elif (top_bid >= stop_loss_price and position.amount < 0):
                     price = market.quantize_order_price(
@@ -634,11 +634,11 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                     for old_order in take_profit_orders:
                         self.cancel_order(self._market_info, old_order.client_order_id)
                         self.logger().info(
-                            f"Canceling existing take profit order {order.client_order_id} in favor of stop loss."
+                            f"[{self.trading_pair}] Canceling existing take profit order in favor of stop loss: {order.client_order_id}"
                         )
                     size = market.quantize_order_amount(self.trading_pair, abs(position.amount))
                     if size > 0 and price > 0:
-                        self.logger().info("Creating stop loss buy order to close short position.")
+                        self.logger().info(f"[{self.trading_pair}] Creating stop loss buy order to close short position.")
                         buys.append(PriceSize(price, size))
         return Proposal(buys, sells)
 
@@ -746,8 +746,7 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
             adjusted_candidate = adjusted_candidates.pop(0)
             if adjusted_candidate.amount == s_decimal_zero:
                 self.logger().info(
-                    f"Insufficient balance: {adjusted_candidate.order_side.name} order (price: {order.price},"
-                    f" size: {order.size}) is omitted."
+                    f"[{self.trading_pair}] Insufficient balance: order side={adjusted_candidate.order_side.name} price={order.price} size={order.size}"
                 )
                 self.logger().warning(
                     "You are also at a possible risk of being liquidated if there happens to be an open loss.")
@@ -820,9 +819,9 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
             if self._logging_options & self.OPTION_LOG_MAKER_ORDER_FILLED:
                 self.log_with_clock(
                     logging.INFO,
-                    f"({market_info.trading_pair}) Maker "
-                    f"{'buy' if order_filled_event.trade_type is TradeType.BUY else 'sell'} order of "
-                    f"{order_filled_event.amount} {market_info.base_asset} filled."
+                    f"[{market_info.trading_pair}] Maker "
+                    f"{'buy' if order_filled_event.trade_type is TradeType.BUY else 'sell'} order filled: "
+                    f"{order_filled_event.amount} {market_info.base_asset}"
                 )
 
     def did_complete_buy_order(self, order_completed_event: BuyOrderCompletedEvent):
@@ -839,13 +838,13 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
 
         self.log_with_clock(
             logging.INFO,
-            f"({self.trading_pair}) Maker buy order {order_id} "
+            f"[{self.trading_pair}] Maker buy order has been completely filled: {order_id} "
             f"({limit_order_record.quantity} {limit_order_record.base_currency} @ "
-            f"{limit_order_record.price} {limit_order_record.quote_currency}) has been completely filled."
+            f"{limit_order_record.price} {limit_order_record.quote_currency})"
         )
         self.notify_hb_app_with_timestamp(
-            f"Maker BUY order {limit_order_record.quantity} {limit_order_record.base_currency} @ "
-            f"{limit_order_record.price} {limit_order_record.quote_currency} is filled."
+            f"[{self.trading_pair}] Maker BUY order is filled: {limit_order_record.quantity} {limit_order_record.base_currency} @ "
+            f"{limit_order_record.price} {limit_order_record.quote_currency}"
         )
 
     def did_complete_sell_order(self, order_completed_event: SellOrderCompletedEvent):
@@ -862,31 +861,31 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
 
         self.log_with_clock(
             logging.INFO,
-            f"({self.trading_pair}) Maker sell order {order_id} "
+            f"[{self.trading_pair}] Maker sell order has been completely filled: {order_id} "
             f"({limit_order_record.quantity} {limit_order_record.base_currency} @ "
-            f"{limit_order_record.price} {limit_order_record.quote_currency}) has been completely filled."
+            f"{limit_order_record.price} {limit_order_record.quote_currency})"
         )
         self.notify_hb_app_with_timestamp(
-            f"Maker SELL order {limit_order_record.quantity} {limit_order_record.base_currency} @ "
-            f"{limit_order_record.price} {limit_order_record.quote_currency} is filled."
+            f"[{self.trading_pair}] Maker SELL order is filled: {limit_order_record.quantity} {limit_order_record.base_currency} @ "
+            f"{limit_order_record.price} {limit_order_record.quote_currency}"
         )
 
     def did_change_position_mode_succeed(self, position_mode_changed_event: PositionModeChangeEvent):
         if self._position_mode is position_mode_changed_event.position_mode:
             self.logger().info(
-                f"Changing position mode to {self._position_mode.name} succeeded.")
+                f"[{self.trading_pair}] Changing position mode succeeded: {self._position_mode.name}")
             self._position_mode_ready = True
         else:
             self.logger().warning(
-                f"Changing position mode to {self._position_mode.name} did not succeed.")
+                f"[{self.trading_pair}] Changing position mode did not succeed: {self._position_mode.name}")
             self._position_mode_ready = False
 
     def did_change_position_mode_fail(self, position_mode_changed_event: PositionModeChangeEvent):
         self.logger().error(
-            f"Changing position mode to {self._position_mode.name} failed. "
-            f"Reason: {position_mode_changed_event.message}.")
+            f"[{self.trading_pair}] Changing position mode failed: {self._position_mode.name}, "
+            f"Reason: {position_mode_changed_event.message}")
         self._position_mode_ready = False
-        self.logger().warning("Cannot continue. Please resolve the issue in the account.")
+        self.logger().warning(f"[{self.trading_pair}] Cannot continue. Please resolve the issue in the account.")
 
     def is_within_tolerance(self, current_prices: List[Decimal], proposal_prices: List[Decimal]) -> bool:
         if len(current_prices) != len(proposal_prices):
@@ -920,11 +919,11 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
         if not to_defer_canceling:
             for order in self.active_orders:
                 self.cancel_order(self._market_info, order.client_order_id)
-                self.logger().info(f"Canceling active order {order.client_order_id}.")
+                self.logger().info(f"[{self.trading_pair}] Canceling active order: {order.client_order_id}.")
         else:
-            self.logger().info(f"Not canceling active orders since difference between new order prices "
-                               f"and current order prices is within "
-                               f"{self._order_refresh_tolerance_pct:.2%} order_refresh_tolerance_pct")
+            self.logger().info(f"[{self.trading_pair}] Not canceling active orders since difference between new order prices "
+                               f"and current order prices is within order_refresh_tolerance_pct: "
+                               f"{self._order_refresh_tolerance_pct:.2%}")
             self.set_timers()
 
     def cancel_orders_below_min_spread(self):
@@ -932,11 +931,10 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
         for order in self.active_orders:
             negation = -1 if order.is_buy else 1
             if (negation * (order.price - price) / price) < self._minimum_spread:
-                self.logger().info(f"Order is below minimum spread ({self._minimum_spread})."
-                                   f" Canceling Order: ({'Buy' if order.is_buy else 'Sell'}) "
-                                   f"ID - {order.client_order_id}")
+                self.logger().info(f"[{self.trading_pair}] Order is below minimum spread: {self._minimum_spread}. "
+                                   f" Canceling {'buy' if order.is_buy else 'sell'} order: {order.client_order_id}")
                 self.cancel_order(self._market_info, order.client_order_id)
-                self.logger().info(f"Canceling order {order.client_order_id} below min spread.")
+                self.logger().info(f"[{self.trading_pair}] Canceling order below min spread: {order.client_order_id}")
 
     def to_create_orders(self, proposal: Proposal) -> bool:
         return (self._create_timestamp < self.current_timestamp and
@@ -957,8 +955,8 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                                    f"{buy.price.normalize()} {self.quote_asset}"
                                    for buy in proposal.buys]
                 self.logger().info(
-                    f"({self.trading_pair}) Creating {len(proposal.buys)} {self._close_order_type.name} bid orders "
-                    f"at (Size, Price): {price_quote_str} to {position_action.name} position."
+                    f"[{self.trading_pair}] Creating bid orders: buys={len(proposal.buys)} close order type={self._close_order_type.name} "
+                    f"price={price_quote_str} position={position_action.name}"
                 )
             for buy in proposal.buys:
                 bid_order_id = self.buy_with_specific_market(
@@ -982,8 +980,8 @@ class PerpetualMarketMakingStrategy(StrategyPyBase):
                                    f"{sell.price.normalize()} {self.quote_asset}"
                                    for sell in proposal.sells]
                 self.logger().info(
-                    f"({self.trading_pair}) Creating {len(proposal.sells)}  {self._close_order_type.name} ask "
-                    f"orders at (Size, Price): {price_quote_str} to {position_action.name} position."
+                    f"[{self.trading_pair}] Creating ask orders: sells={len(proposal.sells)}  close order type={self._close_order_type.name} "
+                    f"price={price_quote_str} position={position_action.name}"
                 )
             for sell in proposal.sells:
                 ask_order_id = self.sell_with_specific_market(

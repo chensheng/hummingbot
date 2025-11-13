@@ -389,16 +389,16 @@ class InFlightOrder:
 
     def build_order_created_message(self) -> str:
         return (
-            f"Created {self.order_type.name.upper()} {self.trade_type.name.upper()} order "
-            f"{self.client_order_id} for {self.amount} {self.trading_pair} "
-            f"at {self.price}."
+            f"[{self.trading_pair}] Created order: order no={self.client_order_id}({self.exchange_order_id}) "
+            f"order type={self.order_type.name.upper()} trade type={self.trade_type.name.upper()} "
+            f"amount={self.amount} price={self.price} "
         )
 
 
 class PerpetualDerivativeInFlightOrder(InFlightOrder):
     def build_order_created_message(self) -> str:
         return (
-            f"Created {self.order_type.name.upper()} {self.trade_type.name.upper()} order "
-            f"{self.client_order_id} for {self.amount} to {self.position.name.upper()} a {self.trading_pair} position "
-            f"at {self.price}."
+            f"[{self.trading_pair}] Created order to {self.position.name.upper()} a {self.trading_pair} position: order no={self.client_order_id}({self.exchange_order_id}) "
+            f"order type={self.order_type.name.upper()} trade type={self.trade_type.name.upper()} "
+            f"amount={self.amount} price={self.price} "
         )
