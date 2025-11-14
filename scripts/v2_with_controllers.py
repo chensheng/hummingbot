@@ -135,7 +135,7 @@ class V2WithControllers(StrategyV2Base):
                 if perf_report.close_type_counts is None or len(perf_report.close_type_counts) == 0:
                     continue
                 
-                closed_type = perf_report.close_type_counts.keys()[0]
+                closed_type = list(perf_report.close_type_counts.keys())[0]
                 self._log_info(controller, f"Stopping controller: {controller_id} Reason: {closed_type}")
                 self.shutdown_controllers.append(controller_id)
                 controller.stop()
