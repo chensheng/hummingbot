@@ -41,7 +41,7 @@ class DManV3ControllerConfig(DirectionalTradingControllerConfigBase):
     bb_long_threshold: float = Field(default=0.0)
     bb_short_threshold: float = Field(default=1.0)
     trailing_stop: Optional[TrailingStop] = Field(
-        default="0.015,0.005",
+        default=None,
         json_schema_extra={
             "prompt": "Enter the trailing stop parameters (activation_price, trailing_delta) as a comma-separated list: ",
             "prompt_on_new": True,
