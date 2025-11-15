@@ -44,7 +44,7 @@ class DCAExecutor(ExecutorBase):
         if self.is_any_amount_lower_than_min_order_size():
             self.close_execution_by(CloseType.FAILED)
             trading_rules = self.get_trading_rules(connector_name=config.connector_name, trading_pair=config.trading_pair)
-            self.logger().error("Please increase the amount of the order:"
+            self.logger().info(f"[{config.trading_pair}] Please increase the amount of the order:"
                                 f"- Current amounts quote: {config.amounts_quote} | Min notional size: {trading_rules.min_notional_size}"
                                 f"- Current amounts base: {[amount / price for amount, price in zip(config.amounts_quote, config.prices)]} | Min order size: {trading_rules.min_order_size}")
         # set default bounds
@@ -262,7 +262,9 @@ class DCAExecutor(ExecutorBase):
         adjusted_order_candidates = self.adjust_order_candidates(self.config.connector_name, order_candidates)
         if any([order_candidate.amount == Decimal("0") for order_candidate in adjusted_order_candidates]):
             self.close_execution_by(CloseType.INSUFFICIENT_BALANCE)
-            self.logger().error("Not enough budget to create DCA.")
+            self.logger().error(f"[{self.config.trading_pair}] Not enough budget to create DCA.")
+
+            
 
     async def control_task(self):
         """
@@ -448,15 +450,15 @@ class DCAExecutor(ExecutorBase):
             for order in self.active_close_orders:
                 self.update_tracked_orders_with_order_id(order.order_id)
                 if order.order and order.order.is_done and order.executed_amount_base == Decimal("0"):
-                    self.logger().error(
-                        f"Close order {order.order_id} is done, might be an error with this update. Cancelling the order and placing it again.")
+                    self.logger().info(
+                        f"[{self.config.trading_pair}] Close order {order.order_id} is done, might be an error with this update. Cancelling the order and placing it again.")
                     self._strategy.cancel(connector_name=self.config.connector_name, trading_pair=self.config.trading_pair,
                                           order_id=order.order_id)
                     self._close_orders.remove(order)
                     self._failed_orders.append(order)
         else:
             self.logger().info(
-                f"Open amount: {self.open_filled_amount}, Close amount: {self.close_filled_amount}, Back up filled amount {self._total_executed_amount_backup}")
+                f"[{self.config.trading_pair}] Open amount: {self.open_filled_amount}, Close amount: {self.close_filled_amount}, Back up filled amount {self._total_executed_amount_backup}")
             self.place_close_order_and_cancel_open_orders()
             self._current_retries += 1
         await asyncio.sleep(5.0)
@@ -491,12 +493,12 @@ class DCAExecutor(ExecutorBase):
         if open_order:
             self._failed_orders.append(open_order)
             self._open_orders.remove(open_order)
-            self.logger().error(f"Order {event.order_id} failed.")
+            self.logger().error(f"[{self.config.trading_pair}] Order failed: {event.order_id}")
         close_order = next((order for order in self._close_orders if order.order_id == event.order_id), None)
         if close_order:
             self._failed_orders.append(close_order)
             self._close_orders.remove(close_order)
-            self.logger().error(f"Order {event.order_id} failed.")
+            self.logger().error(f"[{self.config.trading_pair}] Order failed: {event.order_id}")
             self._current_retries += 1
 
     def evaluate_max_retries(self):
@@ -506,7 +508,7 @@ class DCAExecutor(ExecutorBase):
         """
         if self._current_retries >= self._max_retries:
             self.close_execution_by(CloseType.FAILED)
-            self.logger().error("Max retries reached. Stopping DCA executor.")
+            self.logger().error(f"[{self.config.trading_pair}] Max retries reached. Stopping DCA executor.")
 
     def process_order_filled_event(self, event_tag: int, market: ConnectorBase, event: OrderFilledEvent):
         """

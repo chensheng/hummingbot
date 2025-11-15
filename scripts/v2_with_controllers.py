@@ -11,6 +11,7 @@ from hummingbot.strategy_v2.models.base import RunnableStatus
 from hummingbot.strategy_v2.models.executor_actions import CreateExecutorAction, StopExecutorAction
 from hummingbot.strategy_v2.models.executors_info import PerformanceReport
 from hummingbot.strategy_v2.controllers.controller_base import ControllerBase
+from hummingbot.strategy_v2.models.executors import CloseType
 
 
 class V2WithControllersConfig(StrategyV2ConfigBase):
@@ -134,8 +135,16 @@ class V2WithControllers(StrategyV2Base):
                 
                 if perf_report.close_type_counts is None or len(perf_report.close_type_counts) == 0:
                     continue
+
+                stoppable_close_types = [CloseType.STOP_LOSS, CloseType.TAKE_PROFIT, 
+                                       CloseType.TIME_LIMIT, CloseType.TRAILING_STOP, 
+                                       CloseType.EARLY_STOP, CloseType.EXPIRED, 
+                                       CloseType.FAILED, CloseType.COMPLETED, CloseType.INSUFFICIENT_BALANCE]
+                intersection = set(stoppable_close_types) & set(perf_report.close_type_counts.keys())
+                if not intersection:
+                    continue
                 
-                closed_type = list(perf_report.close_type_counts.keys())[0]
+                closed_type = list(intersection)[0]
                 self._log_info(controller, f"Stopping controller: {controller_id} Reason: {closed_type}")
                 self.shutdown_controllers.append(controller_id)
                 controller.stop()
