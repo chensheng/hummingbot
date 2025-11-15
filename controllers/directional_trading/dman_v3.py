@@ -14,7 +14,7 @@ from hummingbot.strategy_v2.controllers.directional_trading_controller_base impo
 )
 from hummingbot.strategy_v2.executors.dca_executor.data_types import DCAExecutorConfig, DCAMode
 from hummingbot.strategy_v2.executors.position_executor.data_types import TrailingStop
-
+import time
 
 class DManV3ControllerConfig(DirectionalTradingControllerConfigBase):
     controller_name: str = "dman_v3"
@@ -153,6 +153,7 @@ class DManV3Controller(DirectionalTradingControllerBase):
                 interval=config.interval,
                 max_records=self.max_records
             )]
+        self.last_log_time = 0
         super().__init__(config, *args, **kwargs)
 
     async def update_processed_data(self):
@@ -164,6 +165,7 @@ class DManV3Controller(DirectionalTradingControllerBase):
         df.ta.bbands(length=self.config.bb_length, std=self.config.bb_std, append=True)
 
         # Generate signal
+        bbp = df[f"BBP_{self.config.bb_length}_{self.config.bb_std}"]
         long_condition = df[f"BBP_{self.config.bb_length}_{self.config.bb_std}"] < self.config.bb_long_threshold
         short_condition = df[f"BBP_{self.config.bb_length}_{self.config.bb_std}"] > self.config.bb_short_threshold
 
@@ -175,6 +177,11 @@ class DManV3Controller(DirectionalTradingControllerBase):
         # Update processed data
         self.processed_data["signal"] = df["signal"].iloc[-1]
         self.processed_data["features"] = df
+
+        current_time = time.time()
+        if current_time - self.last_log_time > 120:  # 2 minute
+            self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] bollinger data: current bbp={bbp.iloc[-1]}, long threshold={self.config.bb_long_threshold}, short threshold={self.config.bb_short_threshold}")
+            self.last_log_time = current_time
 
     def get_spread_multiplier(self) -> Decimal:
         if self.config.dynamic_order_spread:
