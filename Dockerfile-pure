@@ -1,5 +1,5 @@
 # Set the base image
-FROM python:3.10-slim AS builder
+FROM continuumio/miniconda3:latest AS builder
 
 # Install system dependencies
 RUN apt-get update && \
@@ -8,30 +8,10 @@ RUN apt-get update && \
 
 WORKDIR /home/hummingbot
 
-# Copy environment specification
+# Create conda environment
 COPY setup/environment.yml /tmp/environment.yml
-COPY setup/pip_packages.txt /tmp/pip_packages.txt
-
-# Install packages directly with pip
-RUN python3 -m pip install --upgrade pip && \
-    # Extract package names from conda environment.yml and convert to pip format
-    pip install aiohttp>=3.8.5 asyncssh>=2.13.2 aioprocessing>=2.0.1 \
-               aioresponses>=0.7.4 aiounittest>=1.4.2 async-timeout>=4.0.2 \
-               bidict>=0.22.1 bip-utils cachetools>=5.3.1 commlib-py>=0.11 \
-               cryptography>=41.0.2 injective-py==1.11.* eth-account>=0.13.0 \
-               msgpack-python numpy>=1.25.0,<2 objgraph pandas>=2.0.3 \
-               pandas-ta>=0.3.14b prompt_toolkit>=3.0.39 protobuf>=4.23.3 \
-               psutil>=5.9.5 ptpython>3.0.25 pydantic>=2 pyjwt>=2.3.0 \
-               pyperclip>=1.8.2 requests>=2.31.0 ruamel.yaml>=0.2.5 \
-               rust safe-pysha3 scalecodec scipy>=1.11.1 six>=1.16.0 \
-               sqlalchemy>=1.4.49 tabulate>=0.9.0 ujson>=5.7.0 \
-               urllib3>=1.26.15,<2.0 web3 xrpl-py==4.1.0 yaml>=0.2.5 \
-               zlib>=1.2.13 autopep8 conda-build>=3.26.0 coverage>=7.2.7 \
-               cython flake8>=6.0.0 diff-cover>=7.7.0 pre-commit>=3.3.3 \
-               pytest>=7.4.0 pytest-asyncio>=0.16.0 setuptools==80.8.0 && \
-    # Install additional pip packages
-    python3 -m pip install --no-deps -r /tmp/pip_packages.txt && \
-    rm /tmp/pip_packages.txt && \
+RUN conda env create -f /tmp/environment.yml && \
+    conda clean -afy && \
     rm /tmp/environment.yml
 
 # Copy remaining files
@@ -39,16 +19,27 @@ COPY bin/ bin/
 COPY hummingbot/ hummingbot/
 COPY scripts/ scripts/
 COPY controllers/ controllers/
+COPY scripts/ scripts-copy/
 COPY setup.py .
 COPY LICENSE .
 COPY README.md .
+
+# activate hummingbot env when entering the CT
+SHELL [ "/bin/bash", "-lc" ]
+RUN echo "conda activate hummingbot" >> ~/.bashrc
+
+COPY setup/pip_packages.txt /tmp/pip_packages.txt
+RUN python3 -m pip install --no-deps -r /tmp/pip_packages.txt && \
+    rm /tmp/pip_packages.txt
+
 
 RUN python3 setup.py build_ext --inplace -j 8 && \
     rm -rf build/ && \
     find . -type f -name "*.cpp" -delete
 
+
 # Build final image using artifacts from builder
-FROM python:3.10-slim AS release
+FROM continuumio/miniconda3:latest AS release
 
 # Dockerfile author / maintainer
 LABEL maintainer="Fede Cardoso @dardonacci <federico@hummingbot.org>"
@@ -79,8 +70,12 @@ RUN mkdir -p /home/hummingbot/conf /home/hummingbot/conf/connectors /home/hummin
 WORKDIR /home/hummingbot
 
 # Copy all build artifacts from builder image
-COPY --from=builder /usr/local/ /usr/local/
+COPY --from=builder /opt/conda/ /opt/conda/
 COPY --from=builder /home/ /home/
 
+# Setting bash as default shell because we have .bashrc with customized PATH (setting SHELL affects RUN, CMD and ENTRYPOINT, but not manual commands e.g. `docker run image COMMAND`!)
+SHELL [ "/bin/bash", "-lc" ]
+
 # Set the default command to run when starting the container
-CMD python3 ./bin/hummingbot_quickstart.py 2>> ./logs/errors.log
+
+CMD conda activate hummingbot && ./bin/hummingbot_quickstart.py 2>> ./logs/errors.log
