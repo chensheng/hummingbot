@@ -276,11 +276,11 @@ class MarketMakingControllerBase(ControllerBase):
                     controller_id=self.config.id,
                     executor_config=executor_config
                 ))
-        
-        current_time = time.time()
-        if current_time - self.last_log_time > 120:  # 2 minute
-            self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] Receive levels to execute: {levels_to_execute}")
-            self.last_log_time = current_time
+            
+            current_time = time.time()
+            if current_time - self.last_log_time > 120:  # 2 minute
+                self.logger().info(f"[{self.config.connector_name}][{self.config.trading_pair}] Market making level: level={level_id} price={price} amount={amount}")
+                self.last_log_time = current_time
         
         return create_actions
 
