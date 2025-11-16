@@ -361,7 +361,7 @@ class PositionExecutor(ExecutorBase):
                 await connector._update_orders_with_error_handler(
                     orders=[in_flight_order],
                     error_handler=connector._handle_update_error_for_lost_order)
-                self.logger().info("Waiting for close order to be filled")
+                self.logger().info(f"[{self.config.trading_pair}] Waiting for close order to be filled")
             else:
                 self._failed_orders.append(self._close_order)
                 self._close_order = None
@@ -680,17 +680,17 @@ class PositionExecutor(ExecutorBase):
         if self._open_order and event.order_id == self._open_order.order_id:
             self._failed_orders.append(self._open_order)
             self._open_order = None
-            self.logger().error(f"Open order failed {event.order_id}. Retrying {self._current_retries}/{self._max_retries}")
+            self.logger().error(f"[{self.config.trading_pair}] Open order failed {event.order_id}. Retrying {self._current_retries}/{self._max_retries}")
             self._current_retries += 1
         elif self._close_order and event.order_id == self._close_order.order_id:
             self._failed_orders.append(self._close_order)
             self._close_order = None
-            self.logger().error(f"Close order failed {event.order_id}. Retrying {self._current_retries}/{self._max_retries}")
+            self.logger().error(f"[{self.config.trading_pair}] Close order failed {event.order_id}. Retrying {self._current_retries}/{self._max_retries}")
             self._current_retries += 1
         elif self._take_profit_limit_order and event.order_id == self._take_profit_limit_order.order_id:
             self._failed_orders.append(self._take_profit_limit_order)
             self._take_profit_limit_order = None
-            self.logger().error(f"Take profit order failed {event.order_id}. Retrying {self._current_retries}/{self._max_retries}")
+            self.logger().error(f"[{self.config.trading_pair}] Take profit order failed {event.order_id}. Retrying {self._current_retries}/{self._max_retries}")
 
     def get_custom_info(self) -> Dict:
         return {
