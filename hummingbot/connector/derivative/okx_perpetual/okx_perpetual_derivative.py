@@ -270,7 +270,7 @@ class OkxPerpetualDerivative(PerpetualDerivativePyBase):
 
         result = exchange_order_id["data"][0]
         if result["sCode"] != "0":
-            self.logger().error(f"Error submitting order {order_id}: {data}")
+            self.logger().error(f"[{trading_pair}] Error submitting order: {result['sMsg']}. order no={order_id} data={data}")
             raise IOError(f"Error submitting order {order_id}: {result['sMsg']}")
         return str(result["ordId"]), self.current_timestamp
 
