@@ -70,6 +70,7 @@ class RateOracle(NetworkBase):
         self._fetch_price_task: Optional[asyncio.Task] = None
         self._ready_event = asyncio.Event()
         self._quote_token = quote_token if quote_token is not None else "USD"
+        self._started_once = False  # Flag to track if RateOracle has been started once
 
     def __str__(self):
         return f"{self._source.name} rate oracle"
@@ -115,6 +116,22 @@ class RateOracle(NetworkBase):
         Actual prices retrieved from URL
         """
         return self._prices.copy()
+
+    def start(self):
+        """
+        Start the rate oracle network.
+        This method ensures the rate oracle is only started once.
+        """
+        if not self._started_once:
+            super().start()
+            self._started_once = True
+
+    def stop(self):
+        """
+        Stop the rate oracle network.
+        """
+        super().stop()
+        # Note: We don't reset _started_once here to prevent restart
 
     async def start_network(self):
         await self.stop_network()
