@@ -474,29 +474,16 @@ async def quick_start(args: argparse.Namespace, secrets_manager: BaseSecretsMana
     manager = MultiBotManager()
     await manager.initialize(secrets_manager)
     
-    # Load bots from config file if provided
-    if args.bots_config:
-        bots_config = load_bots_config(args.bots_config)
-        for bot_config in bots_config:
-            account_name = bot_config.get('account')
-            config_file = bot_config.get('config_file')
-            script_conf = bot_config.get('script_conf')
-            connectors_path = bot_config.get('connectors_path')
-            stop_flag = bot_config.get('stop', False)
-            
-            # Only create bot if stop flag is not set
-            if account_name and not stop_flag:
-                await manager.create_bot(account_name, config_file, script_conf, connectors_path)
-        
-        # Start config scanning if enabled
-        await manager.start_config_scanning(args.bots_config, args.scan_interval)
-    else:
-        # Create sample bots for demonstration
-        logging.getLogger().info("No bots config provided. Please provide a bots configuration file.")
+  
+    # Start config scanning first to monitor for changes
+    await manager.start_config_scanning(args.bots_config, args.scan_interval)
     
+    # Keep the process running indefinitely
     try:
-        # Run all bots
-        await manager.run_bots()
+        while True:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        logging.getLogger().info("Received keyboard interrupt. Shutting down...")
     finally:
         # Stop config scanning when done
         manager.stop_config_scanning()
