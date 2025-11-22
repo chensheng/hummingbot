@@ -79,6 +79,9 @@ class HummingbotApplication(*commands):
         # Script configuration support
         self.script_config: Optional[str] = None
 
+        # Headless mode control
+        self._headless_mode_stop_event: asyncio.Event = asyncio.Event()
+
         # Initialize UI components only if not in headless mode
         if not headless_mode:
             self._init_ui_components()
@@ -237,7 +240,7 @@ class HummingbotApplication(*commands):
             self.logger().info("Bot is ready to receive commands via MQTT")
 
             # Keep running until shutdown
-            while True:
+            while not self._headless_mode_stop_event.is_set():
                 await asyncio.sleep(1)
 
         except KeyboardInterrupt:
@@ -280,3 +283,19 @@ class HummingbotApplication(*commands):
 
     def save_client_config(self):
         save_to_yml(CLIENT_CONFIG_PATH, self.client_config_map)
+
+    async def stop(self):
+        """
+        Stop the Hummingbot application and all related components.
+        This includes MQTT gateway and TradingCore.
+        """
+        # Signal headless mode to stop
+        self._headless_mode_stop_event.set()
+        
+        # Stop MQTT gateway if it exists
+        if self._mqtt is not None:
+            self._mqtt.stop()
+            self._mqtt = None
+        
+        # Shutdown trading core
+        await self.trading_core.shutdown()
