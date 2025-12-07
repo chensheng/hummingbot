@@ -47,7 +47,7 @@ class BotInstance:
         self.hummingbot_app: Optional[HummingbotApplication] = None
         self.instance_id: str = str(uuid.uuid4())  # Unique ID for this bot instance
         self.strategy_name: Optional[str] = None
-        self.script_config: Optional[str] = None
+        self.script_conf: Optional[str] = None
         self.config_file_name: Optional[str] = None  # Store the original config file name
 
 
@@ -66,7 +66,7 @@ class MultiBotManager:
         self.bots_config_path: Optional[str] = None
         self.config_scan_task: Optional[asyncio.Task] = None
 
-    async def initialize(self, secrets_manager: BaseSecretsManager):
+    async def initialize(self, secrets_manager: BaseSecretsManager, client_config_map: ClientConfigAdapter):
         """
         Initialize the multi-bot manager.
         
@@ -74,7 +74,7 @@ class MultiBotManager:
             secrets_manager: Secrets manager for decrypting configurations
         """
         self.secrets_manager = secrets_manager
-        self.client_config_map = load_client_config_map_from_file()
+        self.client_config_map = client_config_map
         
         # Initialize logging
         init_logging("hummingbot_logs.yml", self.client_config_map)
@@ -197,6 +197,7 @@ class MultiBotManager:
             # Create bot instance
             bot_instance = BotInstance(bot_name, account_name, config_file_name, connectors_path)
             bot_instance.config_file_name = config_file_name  # Store for reference
+            bot_instance.script_conf = script_conf
             
             # Set custom connectors path for this instance if specified
             if connectors_path:
@@ -219,17 +220,10 @@ class MultiBotManager:
                 self.client_config_map.paper_trade.paper_trade_exchanges
             )
             
-            # Load and start strategy if provided
-            if config_file_name is not None:
-                success = await self._load_and_start_strategy(bot_instance, hb, config_file_name, script_conf)
-                if not success:
-                    logging.getLogger().error(f"Failed to load strategy for bot {bot_name}.")
-                    # We'll continue anyway as the bot might be started later
-            
             # Store reference to this bot
             bot_instance.hummingbot_app = hb
             self.bots[bot_name] = bot_instance
-            
+            await self.start_bot(bot_name)
             logging.getLogger().info(f"Created bot {bot_name} with instance ID {bot_instance.instance_id}")
             return hb
                 
@@ -237,6 +231,32 @@ class MultiBotManager:
             logging.getLogger().error(f"Failed to create bot {bot_name}: {e}")
             return None
 
+    async def wait_for_gateway_ready(hb):
+        """Wait until the gateway is ready before starting the strategy."""
+        exchange_settings = [
+            AllConnectorSettings.get_connector_settings().get(e, None)
+            for e in hb.trading_core.connector_manager.connectors.keys()
+        ]
+        uses_gateway = any([s.uses_gateway_generic_connector() for s in exchange_settings])
+        if not uses_gateway:
+            return
+        try:
+            await asyncio.wait_for(hb.trading_core.gateway_monitor.ready_event.wait(), timeout=300)
+        except asyncio.TimeoutError:
+            logging.getLogger().error(
+                f"TimeoutError waiting for gateway service to go online... Please ensure Gateway is configured correctly."
+                f"Unable to start strategy {hb.trading_core.strategy_name}. ")
+            raise
+
+    async def run_application(hb: HummingbotApplication):
+        # Re-initialize logging with proper strategy file name for headless mode
+        from hummingbot import init_logging
+        log_file_name = hb.strategy_file_name.split(".")[0] if hb.strategy_file_name else "hummingbot"
+        init_logging("hummingbot_logs.yml", hb.client_config_map,
+                     override_log_level=hb.client_config_map.log_level,
+                     strategy_file_path=log_file_name)
+        await hb.run()
+        
     async def _load_and_start_strategy(self, bot_instance: BotInstance, hb: HummingbotApplication, 
                                        config_file_name: str, script_conf: Optional[str] = None) -> bool:
         """
@@ -275,8 +295,8 @@ class MultiBotManager:
             
             # Store for later use
             bot_instance.strategy_name = strategy_name
-            if strategy_config_file:
-                bot_instance.script_config = strategy_config_file
+            # if strategy_config_file:
+            #    bot_instance.script_config = strategy_config_file
 
             logging.getLogger().info(f"Starting script strategy: {strategy_name}")
             success = await hb.trading_core.start_strategy(
@@ -334,9 +354,22 @@ class MultiBotManager:
         if bot_name not in self.bots:
             raise ValueError(f"Bot {bot_name} not found")
             
-        bot = self.bots[bot_name]
-        # TODO: Implement actual bot start logic
-        logging.getLogger().info(f"Started bot {bot_name}")
+        bot_instance = self.bots[bot_name]
+        hb = bot_instance.hummingbot_app
+        config_file_name = bot_instance.config_file_name
+        script_conf = bot_instance.script_conf
+
+        try:
+            if config_file_name is not None:
+                success = await self._load_and_start_strategy(bot_instance, hb, config_file_name, script_conf)
+                if not success:
+                    logging.getLogger().error(f"Failed to load strategy for bot {bot_name}.")
+            
+            await self.wait_for_gateway_ready(hb)
+            await self.run_application(hb)
+            logging.getLogger().info(f"Started bot {bot_name}")
+        except Exception as e:
+            logging.getLogger().error(f"Error starting bot {bot_name}: {e}")
 
     async def stop_bot(self, bot_name: str):
         """
@@ -357,9 +390,7 @@ class MultiBotManager:
                 
             # Close the hummingbot app
             if bot.hummingbot_app:
-                # Stop the app's run loop
-                # Note: In a real implementation, you would need to properly stop the app's event loop
-                pass
+                await bot.hummingbot_app.stop()
                 
             # Clean up the bot instance
             del self.bots[bot_name]
@@ -373,49 +404,6 @@ class MultiBotManager:
         bot_names = list(self.bots.keys())
         for bot_name in bot_names:
             await self.stop_bot(bot_name)
-
-    async def run_bots(self):
-        """
-        Run all bots concurrently.
-        """
-        if not self.bots:
-            logging.getLogger().warning("No bots to run")
-            return
-            
-        tasks = []
-        for bot_name, bot_instance in self.bots.items():
-            if bot_instance.hummingbot_app:
-                tasks.append(bot_instance.hummingbot_app.run())
-                logging.getLogger().info(f"Added bot {bot_name} to run loop")
-            
-        # Also start management console if enabled
-        if self.client_config_map.debug_console:
-            management_port: int = 8211
-            tasks.append(start_management_console(locals(), host="localhost", port=management_port))
-            
-        await safe_gather(*tasks)
-
-    def get_bot(self, bot_name: str) -> Optional[HummingbotApplication]:
-        """
-        Get a specific bot instance.
-        
-        Args:
-            bot_name: Name of the bot
-            
-        Returns:
-            HummingbotApplication instance or None if not found
-        """
-        bot_instance = self.bots.get(bot_name)
-        return bot_instance.hummingbot_app if bot_instance else None
-
-    def list_bots(self) -> List[str]:
-        """
-        List all bot names.
-        
-        Returns:
-            List of bot names
-        """
-        return list(self.bots.keys())
 
     def stop_config_scanning(self):
         """Stop the config scanning task."""
@@ -467,13 +455,12 @@ class MultiBotCmdlineParser(argparse.ArgumentParser):
                           help="Enable debug console.")
 
 
-async def quick_start(args: argparse.Namespace, secrets_manager: BaseSecretsManager):
+async def quick_start(args: argparse.Namespace, secrets_manager: BaseSecretsManager, client_config_map: ClientConfigAdapter):
     """Start multiple Hummingbot instances using unified approach."""
     
     # Create and initialize manager
     manager = MultiBotManager()
-    await manager.initialize(secrets_manager)
-    
+    await manager.initialize(secrets_manager, client_config_map)
   
     # Start config scanning first to monitor for changes
     await manager.start_config_scanning(args.bots_config, args.scan_interval)
@@ -515,7 +502,7 @@ def main():
         ev_loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
         asyncio.set_event_loop(ev_loop)
 
-    ev_loop.run_until_complete(quick_start(args, secrets_manager))
+    ev_loop.run_until_complete(quick_start(args, secrets_manager, client_config_map))
 
 
 if __name__ == "__main__":
