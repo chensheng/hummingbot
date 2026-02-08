@@ -450,5 +450,8 @@ class HtxExchange(ExchangePyBase):
             path_url=path_url,
             params=params,
         )
-        resp_record = resp_json["tick"]["data"][0]
-        return float(resp_record["price"])
+        for record in resp_json["data"]:
+            if record["symbol"] == params["symbol"]:
+                return float(record["close"])
+        raise ValueError(f"Error fetching last trade price for {trading_pair} at {CONSTANTS.EXCHANGE_NAME}. "
+                         f"Response: {resp_json}")
