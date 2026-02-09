@@ -46,6 +46,7 @@ class CandlesFactory:
     _candles_map: Dict[str, Type[CandlesBase]] = {
         "binance_perpetual": BinancePerpetualCandles,
         "binance": BinanceSpotCandles,
+        "htx": BinanceSpotCandles,
         "gate_io": GateioSpotCandles,
         "gate_io_perpetual": GateioPerpetualCandles,
         "kucoin": KucoinSpotCandles,

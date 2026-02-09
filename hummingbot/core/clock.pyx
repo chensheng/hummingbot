@@ -98,6 +98,10 @@ cdef class Clock:
         if not self._started:
             for ci in self._current_context:
                 child_iterator = ci
+                try:
+                    child_iterator.c_start(self, self._current_tick)
+                except Exception:
+                    self.logger().error("Unexpected error starting child iterator.", exc_info=True)
                 child_iterator.c_start(self, self._current_tick)
             self._started = True
 
